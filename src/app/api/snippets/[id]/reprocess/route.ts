@@ -1,10 +1,11 @@
-import { handle, jsonError, kickWorker, readVisitorId, UUID_RE } from "@/lib/api";
+import { handle, jsonError, kickWorker, readVisitorId } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { ownedBy } from "@/lib/snippets";
+import { UUID_RE, type IdContext } from "@/lib/validation";
 import { enqueue } from "@/lib/worker";
 
 /** Regenerates docs, tags and the embedding for a snippet you own. */
-export const POST = handle(async (_request: Request, ctx: RouteContext<"/api/snippets/[id]/reprocess">) => {
+export const POST = handle(async (_request: Request, ctx: IdContext) => {
   const { id } = await ctx.params;
   if (!UUID_RE.test(id)) return jsonError(404, "Snippet not found");
   const db = await getDb();

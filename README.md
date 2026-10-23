@@ -2,7 +2,7 @@
 
 A full-stack knowledge base for code snippets. Paste code in any language. A background worker uses an LLM to write documentation, extract semantic tags and create vector embeddings, so you can find the snippet later by describing what it does ("how to connect to redis in nodejs") rather than remembering what you named it.
 
-**Live demo:** _coming soon_
+**Live demo:** https://ethanyap123.github.io/ai-code-snippet-hub/ (runs entirely in your browser; see [Live demo](#live-demo-github-pages))
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6) ![Postgres + pgvector](https://img.shields.io/badge/Postgres-pgvector-336791) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8)
 
@@ -92,6 +92,15 @@ The schema is idempotent (`CREATE ... IF NOT EXISTS`) and is applied on the firs
 - **A database-backed queue instead of Redis/BullMQ.** No extra infrastructure, and `FOR UPDATE SKIP LOCKED` gives correct concurrent claiming. `after()` gives near-instant processing on serverless without a long-running worker process.
 - **Client-rendered pages on top of a JSON API.** With Next 16 Cache Components the page shells are prerendered and served instantly, and data streams in with explicit skeleton, error and empty states for every async call.
 
+### Live demo (GitHub Pages)
+
+GitHub Pages only serves static files, so the demo is a second build of the same app. `npm run build:demo` sets `NEXT_PUBLIC_DEMO=1`, which:
+
+- switches Next.js to `output: "export"` under the `/ai-code-snippet-hub` base path, and drops the route handlers from the build;
+- sends the client's `/api/*` requests to [`src/lib/demo/browser-api.ts`](src/lib/demo/browser-api.ts) instead of the network. That module runs the **same** schema, seed data, worker, validation and SQL as the server, on PGlite with pgvector in the browser, persisted to IndexedDB.
+
+The demo uses the offline engine, because an LLM key can't be shipped in a public page. Snippets visitors add are stored in their own browser only. A GitHub Actions workflow ([`.github/workflows/pages.yml`](.github/workflows/pages.yml)) type-checks, lints, builds and deploys the demo on every push to `main`.
+
 ## Tech stack
 
 - **Framework:** Next.js 16 (App Router, Cache Components, Turbopack), React 19, TypeScript
@@ -107,7 +116,7 @@ src/
   app/
     page.tsx, dashboard.tsx     Search + library dashboard
     new/                        Editor page and form
-    snippets/[id]/              Snippet detail (docs, related, owner actions)
+    snippet/                    Snippet detail at /snippet?id= (docs, related, owner actions)
     about/                      How it works
     api/
       snippets/                 GET list · POST create
@@ -124,7 +133,10 @@ src/
     ai/local.ts                 Offline engine
     highlight.ts                Shiki (JS regex engine, dual themes)
     languages.ts                Supported languages + detection
+    validation.ts               Zod input parsing shared by the API and the demo
+    demo/browser-api.ts         In-browser API for the static demo (PGlite + IndexedDB)
 scripts/setup.ts                Apply schema, seed, drain the queue, optional test search
+scripts/build-demo.mjs          Static GitHub Pages build
 ```
 
 ## Running locally
@@ -148,6 +160,7 @@ Useful scripts:
 | --- | --- |
 | `npm run dev` | Dev server |
 | `npm run build && npm start` | Production build |
+| `npm run build:demo` | Static in-browser demo build into `out/` |
 | `npm run db:setup -- "your query"` | Apply schema, seed, process every queued job, then run a test search |
 | `npm run typecheck` / `npm run lint` | Type check / lint |
 
@@ -164,7 +177,9 @@ Useful scripts:
 | `SUBMIT_LIMIT_PER_HOUR` | `15` | Submissions per visitor per hour (`0` disables) |
 | `PGLITE_DATA_DIR` | `./.data/pglite` | Where the embedded database lives |
 
-## Deploying (Vercel + Neon)
+## Deploying the full version (Vercel + Neon)
+
+The GitHub Pages demo needs no setup. To host the full server version with Gemini and a shared database:
 
 1. Import the GitHub repository in Vercel. The framework preset is detected automatically.
 2. In the project's **Storage** tab, add a **Neon** Postgres database. This sets `DATABASE_URL`. Neon ships pgvector, and the app runs `CREATE EXTENSION vector` itself.

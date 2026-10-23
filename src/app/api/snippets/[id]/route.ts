@@ -1,8 +1,9 @@
-import { handle, jsonError, kickWorker, readVisitorId, UUID_RE } from "@/lib/api";
+import { handle, jsonError, kickWorker, readVisitorId } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { deleteSnippet, getSnippet, hasOverdueJob, ownedBy } from "@/lib/snippets";
+import { UUID_RE, type IdContext } from "@/lib/validation";
 
-export const GET = handle(async (_request: Request, ctx: RouteContext<"/api/snippets/[id]">) => {
+export const GET = handle(async (_request: Request, ctx: IdContext) => {
   const { id } = await ctx.params;
   if (!UUID_RE.test(id)) return jsonError(404, "Snippet not found");
   const db = await getDb();
@@ -13,7 +14,7 @@ export const GET = handle(async (_request: Request, ctx: RouteContext<"/api/snip
   return Response.json(snippet);
 });
 
-export const DELETE = handle(async (_request: Request, ctx: RouteContext<"/api/snippets/[id]">) => {
+export const DELETE = handle(async (_request: Request, ctx: IdContext) => {
   const { id } = await ctx.params;
   if (!UUID_RE.test(id)) return jsonError(404, "Snippet not found");
   const db = await getDb();

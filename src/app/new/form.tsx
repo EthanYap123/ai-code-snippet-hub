@@ -10,6 +10,7 @@ import { useToast } from "@/components/toast";
 import { ApiClientError, send } from "@/lib/fetcher";
 import { detectLanguage, LANGUAGES, languageLabel } from "@/lib/languages";
 import { MAX_CODE_LENGTH, MAX_TITLE_LENGTH } from "@/lib/limits";
+import { snippetHref } from "@/lib/routes";
 
 // CodeMirror touches the DOM on import, so load it in the browser only.
 const CodeEditor = dynamic(() => import("@/components/code-editor").then((m) => m.CodeEditor), {
@@ -60,7 +61,7 @@ export function NewSnippetForm() {
       // Revalidate cached lists, stats and searches so the new snippet shows up everywhere.
       void mutate(() => true);
       toast("Snippet saved. Generating documentation…");
-      router.push(`/snippets/${res.id}`);
+      router.push(snippetHref(res.id));
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Could not save the snippet. Please try again.");
       setSubmitting(false);

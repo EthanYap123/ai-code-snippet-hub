@@ -1,4 +1,3 @@
-import "server-only";
 import { enginesByEmbedModel, primaryEngine } from "./ai";
 import { tokenize } from "./ai/local";
 import type { Db } from "./db";

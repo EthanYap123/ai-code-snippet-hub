@@ -10,6 +10,7 @@ import { TagChip } from "@/components/badges";
 import { SearchBar } from "@/components/search-bar";
 import { SnippetCard } from "@/components/snippet-card";
 import { CardGridSkeleton, EmptyState, ErrorState, Skeleton } from "@/components/states";
+import { IS_DEMO } from "@/lib/fetcher";
 import { languageLabel } from "@/lib/languages";
 import type { ListResponse, SearchResponse, Stats, TagCount } from "@/lib/types";
 
@@ -201,7 +202,14 @@ function Library({
         {list.error ? (
           <ErrorState message={list.error.message} onRetry={() => list.mutate()} />
         ) : !list.data ? (
-          <CardGridSkeleton />
+          <div className="flex flex-col gap-3">
+            {IS_DEMO && (
+              <p className="text-sm text-muted" role="status">
+                Starting Postgres in your browser… the first visit takes a few seconds.
+              </p>
+            )}
+            <CardGridSkeleton />
+          </div>
         ) : items.length === 0 ? (
           <EmptyState title={filtered ? "No snippets match these filters" : "No snippets yet"}>
             {filtered ? (

@@ -23,7 +23,7 @@ async function parse<T>(res: Response): Promise<T> {
 export async function fetcher<T>(url: string): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(url, { headers: { accept: "application/json" } });
+    res = await request(url, { headers: { accept: "application/json" } });
   } catch {
     throw new ApiClientError("Can't reach the server. Check your connection and try again.", 0);
   }
@@ -33,7 +33,7 @@ export async function fetcher<T>(url: string): Promise<T> {
 export async function send<T>(url: string, method: "POST" | "DELETE", body?: unknown): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await request(url, {
       method,
       headers: body === undefined ? undefined : { "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -42,4 +42,16 @@ export async function send<T>(url: string, method: "POST" | "DELETE", body?: unk
     throw new ApiClientError("Can't reach the server. Check your connection and try again.", 0);
   }
   return parse<T>(res);
+}
+
+/** True in the static GitHub Pages build, where there is no server to call. */
+export const IS_DEMO = process.env.NEXT_PUBLIC_DEMO === "1";
+
+async function request(url: string, init: RequestInit): Promise<Response> {
+  if (IS_DEMO) {
+    // Loaded on demand so the server build never ships the in-browser database.
+    const { demoFetch } = await import("./demo/browser-api");
+    return demoFetch(url, init);
+  }
+  return fetch(url, init);
 }

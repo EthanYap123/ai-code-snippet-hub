@@ -1,4 +1,3 @@
-import "server-only";
 import { createHighlighter, type Highlighter } from "shiki";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 import { LANGUAGES } from "./languages";

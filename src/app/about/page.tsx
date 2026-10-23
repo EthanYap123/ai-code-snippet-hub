@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { IS_DEMO } from "@/lib/fetcher";
 
 export const metadata: Metadata = { title: "How it works" };
 
@@ -49,10 +50,18 @@ export default function AboutPage() {
 
       <section className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-5 text-sm leading-relaxed">
         <h2 className="font-medium">About the demo</h2>
-        <p className="text-muted">
-          Anyone can add snippets. The ones you add are linked to your browser, so you can regenerate or delete them,
-          while the curated examples stay read-only. Submissions are rate limited per visitor.
-        </p>
+        {IS_DEMO ? (
+          <p className="text-muted">
+            This live demo is a static build with no server. The same schema, worker and SQL run inside your browser on
+            PGlite (Postgres compiled to WebAssembly) with pgvector, using the offline engine for docs and embeddings.
+            Everything you add is stored in this browser only. The curated examples stay read-only.
+          </p>
+        ) : (
+          <p className="text-muted">
+            Anyone can add snippets. The ones you add are linked to your browser, so you can regenerate or delete them,
+            while the curated examples stay read-only. Submissions are rate limited per visitor.
+          </p>
+        )}
         <p className="text-muted">
           Source, architecture notes and setup instructions are on{" "}
           <a

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { DemoBanner } from "@/components/demo-banner";
 import { Header } from "@/components/header";
 import { Providers } from "@/components/providers";
 import { themeInitScript } from "@/components/theme-toggle";
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-dvh flex-col">
         <Providers>
           <Header />
+          <DemoBanner />
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">{children}</main>
           <footer className="border-t border-border">
             <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-5 text-xs text-muted sm:px-6">

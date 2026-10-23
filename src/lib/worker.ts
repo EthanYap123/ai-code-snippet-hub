@@ -1,4 +1,3 @@
-import "server-only";
 import { localEngine, primaryEngine, type Engine } from "./ai";
 import { conceptWords } from "./ai/local";
 import { EngineError } from "./ai/gemini";

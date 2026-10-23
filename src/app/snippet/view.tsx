@@ -2,7 +2,7 @@
 
 import { ArrowLeft, Check, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { LanguageBadge, StatusBadge, TagChip } from "@/components/badges";
@@ -12,6 +12,7 @@ import { TimeAgo } from "@/components/time-ago";
 import { useToast } from "@/components/toast";
 import { ApiClientError, send } from "@/lib/fetcher";
 import { languageLabel } from "@/lib/languages";
+import { snippetHref } from "@/lib/routes";
 import type { SnippetDetail, SnippetStatus } from "@/lib/types";
 
 const pending = (s?: SnippetStatus) => s === "queued" || s === "processing";
@@ -38,14 +39,14 @@ function Prose({ text }: { text: string }) {
 }
 
 export function SnippetView() {
-  const { id } = useParams<{ id: string }>();
-  const { data, error, isLoading, mutate } = useSWR<SnippetDetail>(`/api/snippets/${id}`, {
+  const id = useSearchParams().get("id");
+  const { data, error, isLoading, mutate } = useSWR<SnippetDetail>(id ? `/api/snippets/${encodeURIComponent(id)}` : null, {
     refreshInterval: (d) => (pending(d?.status) ? 1500 : 0),
     keepPreviousData: false,
   });
 
-  if (error) {
-    if (error instanceof ApiClientError && error.status === 404) {
+  if (!id || error) {
+    if (!id || (error instanceof ApiClientError && error.status === 404)) {
       return (
         <div className="flex flex-col gap-6">
           <BackLink />
@@ -280,7 +281,7 @@ function Related({ snippet }: { snippet: SnippetDetail }) {
         <ul className="flex flex-col gap-1">
           {snippet.related.map((r) => (
             <li key={r.id}>
-              <Link href={`/snippets/${r.id}`} className="-mx-2 flex flex-col gap-0.5 rounded-md px-2 py-2 transition hover:bg-surface-2">
+              <Link href={snippetHref(r.id)} className="-mx-2 flex flex-col gap-0.5 rounded-md px-2 py-2 transition hover:bg-surface-2">
                 <span className="flex items-center justify-between gap-2">
                   <span className="truncate text-sm font-medium">{r.title}</span>
                   <span className="shrink-0 font-mono text-[11px] text-muted">{Math.round(r.score * 100)}%</span>

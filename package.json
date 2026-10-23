@@ -7,8 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
-    "db:setup": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/setup.ts"
+    "typecheck": "next typegen && tsc --noEmit",
+    "db:setup": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/setup.ts",
+    "build:demo": "node scripts/build-demo.mjs"
   },
   "dependencies": {
     "@codemirror/language": "^6.13.1",

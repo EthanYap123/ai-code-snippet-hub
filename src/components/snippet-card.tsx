@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { snippetHref } from "@/lib/routes";
 import type { SnippetCard as Card } from "@/lib/types";
 import { LanguageBadge, StatusBadge } from "./badges";
 import { TimeAgo } from "./time-ago";
@@ -8,7 +9,7 @@ import { TimeAgo } from "./time-ago";
 export function SnippetCard({ snippet, score }: { snippet: Card; score?: number }) {
   return (
     <Link
-      href={`/snippets/${snippet.id}`}
+      href={snippetHref(snippet.id)}
       className="group flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-surface transition hover:border-border-strong hover:shadow-sm"
     >
       <div className="flex min-w-0 flex-col gap-2 p-4 pb-3">
