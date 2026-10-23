@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: oklch(0.985 0.002 250);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.965 0.004 250);
+  --border: oklch(0.91 0.006 250);
+  --border-strong: oklch(0.84 0.01 250);
+  --fg: oklch(0.22 0.02 260);
+  --muted: oklch(0.5 0.02 260);
+  --accent: oklch(0.56 0.15 165);
+  --accent-fg: oklch(0.99 0 0);
+  --accent-soft: oklch(0.95 0.04 165);
+  --danger: oklch(0.58 0.2 25);
+  --danger-soft: oklch(0.96 0.03 25);
+  --warn: oklch(0.7 0.15 75);
+  --ring: oklch(0.56 0.15 165 / 0.45);
+  color-scheme: light;
+}
+
+.dark {
+  --bg: oklch(0.17 0.012 260);
+  --surface: oklch(0.205 0.014 260);
+  --surface-2: oklch(0.24 0.015 260);
+  --border: oklch(0.29 0.016 260);
+  --border-strong: oklch(0.36 0.018 260);
+  --fg: oklch(0.94 0.008 260);
+  --muted: oklch(0.7 0.02 260);
+  --accent: oklch(0.76 0.14 165);
+  --accent-fg: oklch(0.18 0.02 165);
+  --accent-soft: oklch(0.3 0.05 165);
+  --danger: oklch(0.7 0.17 25);
+  --danger-soft: oklch(0.3 0.06 25);
+  --warn: oklch(0.8 0.14 80);
+  --ring: oklch(0.76 0.14 165 / 0.45);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+/* Shiki dual-theme output: colours come in as CSS variables per token. */
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
+  background-color: transparent !important;
+}
+.dark .shiki,
+.dark .shiki span {
+  color: var(--shiki-dark);
+}
+.code-block pre {
+  margin: 0;
+  padding: 1rem 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  counter-reset: line;
+}
+.code-block pre code {
+  display: block;
+  min-width: max-content;
+}
+.code-block .line {
+  display: inline-block;
+  width: 100%;
+  padding-right: 1rem;
+}
+.code-block.numbered .line::before {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  width: 2.75rem;
+  padding-right: 1rem;
+  text-align: right;
+  color: var(--muted);
+  opacity: 0.55;
+  user-select: none;
+}
+.code-block:not(.numbered) .line {
+  padding-left: 1rem;
+}
+
+/* Loading skeleton shimmer */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-radius: 0.375rem;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--fg) 6%, transparent), transparent);
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}
+
+/* CodeMirror inherits the app's surface instead of its theme background. */
+.cm-theme .cm-editor {
+  background: transparent;
+  font-size: 0.8125rem;
+}
+.cm-theme .cm-editor.cm-focused {
+  outline: none;
+}
+.cm-theme .cm-gutters {
+  background: transparent;
+  border-right: 1px solid var(--border);
+  color: var(--muted);
+}
+.cm-theme .cm-scroller {
+  font-family: var(--font-mono);
+  line-height: 1.65;
+}
