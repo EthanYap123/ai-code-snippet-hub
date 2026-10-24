@@ -203,6 +203,14 @@ The GitHub Pages demo needs no setup. To host the full server version with Gemin
 
 Errors are always JSON (`{ "error": "..." }`) with a meaningful status code: 400, 403, 404, 422, 429 or 500.
 
+## What I learned
+
+- **Never make the user wait for the LLM.** Saving a snippet returns immediately, and a background worker writes the docs afterwards. Splitting "accept the request" from "do the slow work" made the app feel instant.
+- **A database can be a job queue.** I didn't want to add Redis, so I used Postgres with `FOR UPDATE SKIP LOCKED`. Two workers can never grab the same job, even with many serverless instances running at once.
+- **LLM output can't be trusted as-is.** Even in structured-output mode, I validate every response with Zod. If it fails three times, an offline engine fills in, so a snippet never gets stuck.
+- **Embeddings from different models don't mix.** Switching models would have silently broken search, because vectors from different models live in different spaces. Now each vector stores its model name.
+- **Semantic search alone isn't enough.** Mixing vector similarity (80%) with Postgres full-text rank (20%) gave better results than either one alone.
+
 ## Author
 
 Built by **Ethan Yap**, Year 2 IT student at Singapore Polytechnic. Portfolio: https://ethanyap123.github.io/portfolio/
