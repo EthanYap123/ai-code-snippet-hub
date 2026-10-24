@@ -4,7 +4,7 @@ A full-stack knowledge base for code snippets. Paste code in any language. A bac
 
 **Live demo:** https://ethanyap123.github.io/ai-code-snippet-hub/ (runs entirely in your browser; see [Live demo](#live-demo-github-pages))
 
-![Next.js](https://img.shields.io/badge/Next.js-16-black) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6) ![Postgres + pgvector](https://img.shields.io/badge/Postgres-pgvector-336791) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8)
+![Next.js](https://img.shields.io/badge/Next.js-16-black) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6) ![Postgres + pgvector](https://img.shields.io/badge/Postgres-pgvector-336791) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8) [![Deploy demo](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/pages.yml/badge.svg)](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/pages.yml)
 
 ## Features
 
@@ -206,3 +206,7 @@ Errors are always JSON (`{ "error": "..." }`) with a meaningful status code: 400
 ## Author
 
 Built by **Ethan Yap**, Year 2 IT student at Singapore Polytechnic. Portfolio: https://ethanyap123.github.io/portfolio/
+
+## License
+
+[MIT](LICENSE)
