@@ -3,6 +3,7 @@
 A full-stack knowledge base for code snippets. Paste code in any language. A background worker uses an LLM to write documentation, extract semantic tags and create vector embeddings, so you can find the snippet later by describing what it does ("how to connect to redis in nodejs") rather than remembering what you named it.
 
 **Live app:** https://ai-code-snippet-hub.vercel.app (the full version on Vercel, Neon Postgres and Gemini)
+
 **Browser demo:** https://ethanyap123.github.io/ai-code-snippet-hub/ (runs entirely in your browser; see [Live demo](#live-demo-github-pages))
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6) ![Postgres + pgvector](https://img.shields.io/badge/Postgres-pgvector-336791) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8) [![Deploy demo](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/pages.yml/badge.svg)](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/pages.yml)
