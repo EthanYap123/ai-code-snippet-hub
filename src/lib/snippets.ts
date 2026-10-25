@@ -234,7 +234,9 @@ export async function searchSnippets(
   const add = (row: CardRow, semantic: number, rawKeyword: number) => {
     // ts_rank_cd with normalization 32 is rank/(rank+1); stretch it into 0..1.
     const keyword = Math.min(1, rawKeyword * 2);
-    const score = semantic > 0 ? SEMANTIC_WEIGHT * semantic + (1 - SEMANTIC_WEIGHT) * keyword : keyword;
+    // Keyword-only hits rank on the unstretched value, which never saturates, so
+    // the best matches still come first.
+    const score = semantic > 0 ? SEMANTIC_WEIGHT * semantic + (1 - SEMANTIC_WEIGHT) * keyword : rawKeyword;
     const prev = results.get(row.id);
     if (!prev || prev.score < score) {
       results.set(row.id, { snippet: toCard(row, visitorId), score, semantic, keyword });
