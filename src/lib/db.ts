@@ -1,4 +1,5 @@
 import "server-only";
+import { GUARD_SCHEMA } from "./ai/guard";
 import { SCHEMA } from "./schema";
 
 /**
@@ -70,7 +71,7 @@ export async function getDb(): Promise<Db> {
 
 async function prepare(db: Db) {
   // Neon's HTTP driver runs one statement per request, so apply them one by one.
-  for (const statement of SCHEMA) await db.query(statement);
+  for (const statement of [...SCHEMA, ...GUARD_SCHEMA]) await db.query(statement);
   const { seedIfEmpty } = await import("./seed");
   await seedIfEmpty(db);
 

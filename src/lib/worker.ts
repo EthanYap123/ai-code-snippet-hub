@@ -1,11 +1,16 @@
 import { localEngine, primaryEngine, type Engine } from "./ai";
 import { conceptWords } from "./ai/local";
 import { EngineError } from "./ai/gemini";
+import { blockRemote, remoteBlockedFor, takeRemoteCalls } from "./ai/guard";
 import type { GeneratedDocs } from "./ai/types";
 import type { Db } from "./db";
 import { toVectorLiteral } from "./vector";
 
 const MAX_ATTEMPTS = 3;
+/** Remote calls one job makes: the write-up and its embedding. */
+const CALLS_PER_JOB = 2;
+/** Per-minute limits are waited out; anything longer falls back to the offline engine. */
+const SHORT_COOLDOWN_S = 90;
 /** A job stuck in `running` this long is assumed dead (e.g. a killed function). */
 const STALE_LOCK = "2 minutes";
 
@@ -123,6 +128,25 @@ async function enrich(db: Db, snippet: SnippetRow, engine: Engine) {
   await saveResults(db, snippet, docs, engine, embedding);
 }
 
+async function requeue(db: Db, job: JobRow, snippetId: string, delaySeconds: number, message: string) {
+  await db.query(
+    `UPDATE jobs SET status = 'queued', last_error = $2, run_after = now() + ($3 || ' seconds')::interval, updated_at = now() WHERE id = $1`,
+    [job.id, message, String(delaySeconds)],
+  );
+  await db.query(`UPDATE snippets SET status = 'queued', updated_at = now() WHERE id = $1`, [snippetId]);
+}
+
+/** Documents a snippet with the offline engine instead; false if even that failed. */
+async function fallBack(db: Db, job: JobRow, snippet: SnippetRow, reason: string): Promise<boolean> {
+  try {
+    await enrich(db, snippet, localEngine);
+    await db.query(`UPDATE jobs SET status = 'done', last_error = $2, updated_at = now() WHERE id = $1`, [job.id, `fell back to offline engine: ${reason}`]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function runJob(db: Db, job: JobRow): Promise<"done" | "retry" | "failed"> {
   const [snippet] = await db.query<SnippetRow>(
     `SELECT id, title, language, code, NOT auto_title AS title_from_author FROM snippets WHERE id = $1`,
@@ -135,6 +159,20 @@ async function runJob(db: Db, job: JobRow): Promise<"done" | "retry" | "failed">
   await db.query(`UPDATE snippets SET status = 'processing', updated_at = now() WHERE id = $1`, [snippet.id]);
 
   const engine = primaryEngine();
+  const remote = engine.id !== localEngine.id;
+  if (remote) {
+    // Free-tier protection: wait out a short rate limit, otherwise go offline.
+    const wait = await remoteBlockedFor(db);
+    if (wait > 0 && wait <= SHORT_COOLDOWN_S && job.attempts < MAX_ATTEMPTS) {
+      await requeue(db, job, snippet.id, Math.ceil(wait), "waiting for the Gemini rate limit");
+      return "retry";
+    }
+    if (wait > 0 || !(await takeRemoteCalls(db, CALLS_PER_JOB))) {
+      const reason = wait > 0 ? "Gemini is rate limited" : "the daily Gemini budget is spent";
+      if (await fallBack(db, job, snippet, reason)) return "done";
+    }
+  }
+
   try {
     await enrich(db, snippet, engine);
     await db.query(`UPDATE jobs SET status = 'done', last_error = NULL, updated_at = now() WHERE id = $1`, [job.id]);
@@ -142,28 +180,16 @@ async function runJob(db: Db, job: JobRow): Promise<"done" | "retry" | "failed">
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const retryable = !(err instanceof EngineError) || err.retryable;
+    if (err instanceof EngineError && err.retryAfter) await blockRemote(db, err.retryAfter);
 
     if (retryable && job.attempts < MAX_ATTEMPTS) {
       // Exponential backoff: 5s, 20s, ...
-      const delay = 5 * 4 ** (job.attempts - 1);
-      await db.query(
-        `UPDATE jobs SET status = 'queued', last_error = $2, run_after = now() + ($3 || ' seconds')::interval, updated_at = now() WHERE id = $1`,
-        [job.id, message, String(delay)],
-      );
-      await db.query(`UPDATE snippets SET status = 'queued', updated_at = now() WHERE id = $1`, [snippet.id]);
+      await requeue(db, job, snippet.id, 5 * 4 ** (job.attempts - 1), message);
       return "retry";
     }
 
     // Out of retries with the remote engine: keep the hub usable with the offline one.
-    if (engine.id !== localEngine.id) {
-      try {
-        await enrich(db, snippet, localEngine);
-        await db.query(`UPDATE jobs SET status = 'done', last_error = $2, updated_at = now() WHERE id = $1`, [job.id, `fell back to offline engine: ${message}`]);
-        return "done";
-      } catch {
-        // fall through to failed
-      }
-    }
+    if (remote && (await fallBack(db, job, snippet, message))) return "done";
     await db.query(`UPDATE jobs SET status = 'failed', last_error = $2, updated_at = now() WHERE id = $1`, [job.id, message]);
     await db.query(`UPDATE snippets SET status = 'failed', error = $2, updated_at = now() WHERE id = $1`, [snippet.id, message.slice(0, 500)]);
     return "failed";

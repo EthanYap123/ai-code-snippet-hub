@@ -1,4 +1,6 @@
 import { enginesByEmbedModel, primaryEngine } from "./ai";
+import { EngineError } from "./ai/gemini";
+import { blockRemote } from "./ai/guard";
 import { tokenize } from "./ai/local";
 import type { Db } from "./db";
 import { highlight } from "./highlight";
@@ -174,7 +176,7 @@ async function relatedSnippets(db: Db, id: string): Promise<RelatedSnippet[]> {
 const queryCache = new Map<string, number[]>();
 const QUERY_CACHE_SIZE = 300;
 
-async function embedQuery(model: string, q: string): Promise<number[] | null> {
+async function embedQuery(model: string, q: string, allowRemote: () => Promise<boolean>): Promise<number[] | null> {
   const key = `${model}\u0000${q}`;
   const hit = queryCache.get(key);
   if (hit) {
@@ -185,6 +187,7 @@ async function embedQuery(model: string, q: string): Promise<number[] | null> {
   }
   const engine = enginesByEmbedModel().get(model);
   if (!engine) return null;
+  if (engine.id !== "local" && !(await allowRemote())) return null;
   const [v] = await engine.embed([q], "query");
   queryCache.set(key, v);
   if (queryCache.size > QUERY_CACHE_SIZE) queryCache.delete(queryCache.keys().next().value!);
@@ -202,21 +205,71 @@ const MIN_SCORE = 0.2;
 /** Keyword hits alone should not surface a snippet that means something else. */
 const MIN_SEMANTIC = 0.15;
 
-export async function searchSnippets(db: Db, q: string, visitorId: string | null, limit = 20): Promise<SearchResult[]> {
+/** Title and tags weigh more than the summary in keyword ranking. */
+const DOC_TSVECTOR = `
+  setweight(to_tsvector('english', s.title), 'A') ||
+  setweight(to_tsvector('english', coalesce(d.summary, '')), 'B') ||
+  setweight(to_tsvector('english', coalesce((SELECT string_agg(t.name, ' ')
+    FROM snippet_tags st JOIN tags t ON t.id = st.tag_id WHERE st.snippet_id = s.id), '')), 'A')`;
+
+export interface SearchOptions {
+  limit?: number;
+  /**
+   * Asked before each uncached remote query embedding. When it says no, snippets
+   * embedded by that model are matched on keywords only.
+   */
+  allowRemote?: () => Promise<boolean>;
+}
+
+export async function searchSnippets(
+  db: Db,
+  q: string,
+  visitorId: string | null,
+  { limit = 20, allowRemote = async () => true }: SearchOptions = {},
+): Promise<SearchResult[]> {
   const models = await db.query<{ model: string }>(`SELECT DISTINCT model FROM snippet_embeddings`);
   const tsq = keywordQuery(q);
   const results = new Map<string, SearchResult>();
+  const keywordOnly = new Set<string>();
+  const add = (row: CardRow, semantic: number, rawKeyword: number) => {
+    // ts_rank_cd with normalization 32 is rank/(rank+1); stretch it into 0..1.
+    const keyword = Math.min(1, rawKeyword * 2);
+    const score = semantic > 0 ? SEMANTIC_WEIGHT * semantic + (1 - SEMANTIC_WEIGHT) * keyword : keyword;
+    const prev = results.get(row.id);
+    if (!prev || prev.score < score) {
+      results.set(row.id, { snippet: toCard(row, visitorId), score, semantic, keyword });
+    }
+  };
 
   for (const { model } of models) {
     let vector: number[] | null;
     try {
-      vector = await embedQuery(model, q);
+      vector = await embedQuery(model, q, allowRemote);
     } catch (err) {
       // A remote embedding outage should degrade search, not break it.
       console.error(`query embedding failed for ${model}:`, (err as Error).message);
+      if (err instanceof EngineError && err.retryAfter) await blockRemote(db, err.retryAfter);
       vector = null;
     }
-    if (!vector) continue;
+
+    if (!vector) {
+      // No query vector for this model (budget spent, rate limited or outage):
+      // fall back to full-text search over the snippets it embedded.
+      if (!tsq) continue;
+      const rows = await db.query<CardRow & { keyword: number }>(
+        `SELECT ${CARD_COLUMNS}, ts_rank_cd(${DOC_TSVECTOR}, to_tsquery('english', $2), 32)::float AS keyword
+           ${CARD_FROM}
+           JOIN snippet_embeddings e ON e.snippet_id = s.id AND e.model = $1
+          WHERE (${DOC_TSVECTOR}) @@ to_tsquery('english', $2)
+          LIMIT 50`,
+        [model, tsq],
+      );
+      for (const row of rows) {
+        if (!results.has(row.id)) keywordOnly.add(row.id);
+        add(row, 0, Number(row.keyword));
+      }
+      continue;
+    }
 
     const rows = await db.query<CardRow & { semantic: number; keyword: number }>(
       `WITH cand AS (
@@ -227,12 +280,7 @@ export async function searchSnippets(db: Db, q: string, visitorId: string | null
           LIMIT 50
        )
        SELECT ${CARD_COLUMNS}, c.semantic,
-              CASE WHEN $3 = '' THEN 0 ELSE ts_rank_cd(
-                setweight(to_tsvector('english', s.title), 'A') ||
-                setweight(to_tsvector('english', coalesce(d.summary, '')), 'B') ||
-                setweight(to_tsvector('english', coalesce((SELECT string_agg(t.name, ' ')
-                  FROM snippet_tags st JOIN tags t ON t.id = st.tag_id WHERE st.snippet_id = s.id), '')), 'A'),
-                to_tsquery('english', $3), 32) END::float AS keyword
+              CASE WHEN $3 = '' THEN 0 ELSE ts_rank_cd(${DOC_TSVECTOR}, to_tsquery('english', $3), 32) END::float AS keyword
          FROM cand c
          JOIN snippets s ON s.id = c.snippet_id
          JOIN users u ON u.id = s.user_id
@@ -241,21 +289,17 @@ export async function searchSnippets(db: Db, q: string, visitorId: string | null
     );
 
     for (const row of rows) {
-      const semantic = Math.max(0, Number(row.semantic));
-      // ts_rank_cd with normalization 32 is rank/(rank+1); stretch it into 0..1.
-      const keyword = Math.min(1, Number(row.keyword) * 2);
-      const score = SEMANTIC_WEIGHT * semantic + (1 - SEMANTIC_WEIGHT) * keyword;
-      const prev = results.get(row.id);
-      if (!prev || prev.score < score) {
-        results.set(row.id, { snippet: toCard(row, visitorId), score, semantic, keyword });
-      }
+      keywordOnly.delete(row.id);
+      add(row, Math.max(0, Number(row.semantic)), Number(row.keyword));
     }
   }
 
   const sorted = [...results.values()].sort((a, b) => b.score - a.score);
   const top = sorted[0]?.score ?? 0;
   // Keep results that are both reasonably relevant and not far behind the best hit.
-  return sorted.filter((r) => r.semantic >= MIN_SEMANTIC && r.score >= Math.max(MIN_SCORE, top * 0.6)).slice(0, limit);
+  return sorted
+    .filter((r) => (keywordOnly.has(r.snippet.id) || r.semantic >= MIN_SEMANTIC) && r.score >= Math.max(MIN_SCORE, top * 0.6))
+    .slice(0, limit);
 }
 
 // ---------------------------------------------------------------------------

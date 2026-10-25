@@ -92,6 +92,15 @@ The schema is idempotent (`CREATE ... IF NOT EXISTS`) and is applied on the firs
 - **A database-backed queue instead of Redis/BullMQ.** No extra infrastructure, and `FOR UPDATE SKIP LOCKED` gives correct concurrent claiming. `after()` gives near-instant processing on serverless without a long-running worker process.
 - **Client-rendered pages on top of a JSON API.** With Next 16 Cache Components the page shells are prerendered and served instantly, and data streams in with explicit skeleton, error and empty states for every async call.
 
+### Free-tier protection
+
+The public deployment runs on a free Gemini key, so strangers must not be able to burn through its quota. The counters live in Postgres (`ai_usage`, `rate_limits`), so every serverless instance shares them.
+
+- **Per-visitor limits** (keyed by a salted IP hash): 15 new snippets an hour, 5 regenerations an hour and 60 searches a minute. Over the limit the API answers `429` with a friendly message.
+- **A daily budget** of Gemini calls for the whole site. Each snippet costs two calls (write-up and embedding) and each uncached search costs one.
+- **A circuit breaker.** When Gemini answers `429`, every instance stops calling it: for Gemini's `retryDelay` on a per-minute limit (jobs wait it out), or for an hour when the daily quota is spent.
+- **Graceful fallback.** When the budget is spent, Gemini is cooling down or it keeps failing, new snippets are documented by the offline engine straight away, and search falls back to Postgres full-text search for Gemini-embedded snippets. Nothing gets stuck or breaks.
+
 ### Live demo (GitHub Pages)
 
 GitHub Pages only serves static files, so the demo is a second build of the same app. `npm run build:demo` sets `NEXT_PUBLIC_DEMO=1`, which:
@@ -175,16 +184,18 @@ Useful scripts:
 | `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-001` | Embedding model (requested at 768 dimensions) |
 | `CRON_SECRET` | — | Required to call `/api/worker` in production; Vercel Cron sends it automatically |
 | `SUBMIT_LIMIT_PER_HOUR` | `15` | Submissions per visitor per hour (`0` disables) |
+| `SEARCH_LIMIT_PER_MINUTE` | `60` | Searches per visitor per minute (`0` disables). The first third may embed the query with Gemini; the rest match on keywords |
+| `GEMINI_DAILY_LIMIT` | `300` | Gemini calls per UTC day across all visitors (`0` disables). After that the offline engine takes over until the next day |
 | `PGLITE_DATA_DIR` | `./.data/pglite` | Where the embedded database lives |
 
 ## Deploying the full version (Vercel + Neon)
 
 The GitHub Pages demo needs no setup. To host the full server version with Gemini and a shared database:
 
-1. Import the GitHub repository in Vercel. The framework preset is detected automatically.
-2. In the project's **Storage** tab, add a **Neon** Postgres database. This sets `DATABASE_URL`. Neon ships pgvector, and the app runs `CREATE EXTENSION vector` itself.
-3. Add `GEMINI_API_KEY` and a random `CRON_SECRET` under **Settings → Environment Variables**.
-4. Deploy. The first request creates the schema and seeds the demo snippets, and the worker documents them in the background within about a minute.
+1. Import the GitHub repository in Vercel. [`vercel.json`](vercel.json) pins the server build (`npm run build`, never the static demo), the Singapore region (`sin1`) and the daily worker cron.
+2. In the project's **Storage** tab, add a **Neon** Postgres database in the same region. This sets `DATABASE_URL`. Neon ships pgvector, and the app runs `CREATE EXTENSION vector` itself.
+3. Add `GEMINI_API_KEY` (Production only, so preview deploys don't use the quota) and a random `CRON_SECRET` under **Settings → Environment Variables**.
+4. Deploy. The first request creates the schema and seeds the demo snippets, and the worker documents them in the background within about a minute. To do it up front instead, pull the variables with `vercel env pull .env.local` and run `npm run db:setup`.
 
 ## API
 
