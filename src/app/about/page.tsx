@@ -54,12 +54,23 @@ export default function AboutPage() {
           <p className="text-muted">
             This live demo is a static build with no server. The same schema, worker and SQL run inside your browser on
             PGlite (Postgres compiled to WebAssembly) with pgvector, using the offline engine for docs and embeddings.
-            Everything you add is stored in this browser only. The curated examples stay read-only.
+            Everything you add is stored in this browser only. The curated examples stay read-only. The full version,
+            with Gemini and a shared Neon database, is live at{" "}
+            <a
+              href="https://ai-code-snippet-hub.vercel.app"
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent underline-offset-2 hover:underline"
+            >
+              ai-code-snippet-hub.vercel.app
+            </a>
+            .
           </p>
         ) : (
           <p className="text-muted">
             Anyone can add snippets. The ones you add are linked to your browser, so you can regenerate or delete them,
-            while the curated examples stay read-only. Submissions are rate limited per visitor.
+            while the curated examples stay read-only. Submissions and searches are rate limited per visitor, and a daily
+            AI budget keeps the free Gemini quota safe.
           </p>
         )}
         <p className="text-muted">

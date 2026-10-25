@@ -10,15 +10,15 @@ export function DemoBanner() {
         <FlaskConical className="mt-0.5 size-3.5 shrink-0 text-accent sm:mt-0" aria-hidden />
         <p>
           <strong className="font-medium">Live demo, running entirely in your browser:</strong> Postgres + pgvector
-          (PGlite) and the offline docs engine. Snippets you add are saved in this browser only. The full version with
-          Gemini runs locally from{" "}
+          (PGlite) and the offline docs engine. Snippets you add are saved in this browser only. The full version, with
+          Gemini docs and a shared database, is live at{" "}
           <a
-            href="https://github.com/EthanYap123/ai-code-snippet-hub#running-locally"
+            href="https://ai-code-snippet-hub.vercel.app"
             target="_blank"
             rel="noreferrer"
             className="font-medium text-accent underline-offset-2 hover:underline"
           >
-            the repo
+            ai-code-snippet-hub.vercel.app
           </a>
           .
         </p>
