@@ -11,6 +11,8 @@ export class EngineError extends Error {
     readonly status?: number,
     /** Rate limits and 5xx are worth retrying; bad requests are not. */
     readonly retryable = true,
+    /** After a 429: seconds to stop calling the provider (long for a spent daily quota). */
+    readonly retryAfter?: number,
   ) {
     super(message);
   }
@@ -64,6 +66,13 @@ function normalize(v: number[]): number[] {
   return v.map((x) => x / n);
 }
 
+/** How long to back off after a 429: an hour for a daily quota, else Gemini's retryDelay. */
+function cooldown(body: string): number {
+  if (/PerDay/i.test(body)) return 3600;
+  const delay = body.match(/"retryDelay":\s*"(\d+(?:\.\d+)?)s"/);
+  return delay ? Math.min(Math.ceil(Number(delay[1])), 300) : 60;
+}
+
 async function call<T>(path: string, body: unknown, key: string): Promise<T> {
   let res: Response;
   try {
@@ -77,9 +86,9 @@ async function call<T>(path: string, body: unknown, key: string): Promise<T> {
     throw new EngineError(`Gemini request failed: ${(err as Error).message}`);
   }
   if (!res.ok) {
-    const detail = (await res.text()).slice(0, 300);
+    const text = await res.text();
     const retryable = res.status === 429 || res.status >= 500;
-    throw new EngineError(`Gemini returned ${res.status}: ${detail}`, res.status, retryable);
+    throw new EngineError(`Gemini returned ${res.status}: ${text.slice(0, 300)}`, res.status, retryable, res.status === 429 ? cooldown(text) : undefined);
   }
   return (await res.json()) as T;
 }

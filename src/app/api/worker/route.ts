@@ -1,4 +1,5 @@
 import { handle, jsonError } from "@/lib/api";
+import { pruneGuardTables } from "@/lib/ai/guard";
 import { getDb } from "@/lib/db";
 import { drainQueue } from "@/lib/worker";
 
@@ -15,7 +16,9 @@ async function run(request: Request) {
   if (!secret && process.env.NODE_ENV === "production") {
     return jsonError(503, "Set CRON_SECRET to enable the worker endpoint");
   }
-  const result = await drainQueue(await getDb());
+  const db = await getDb();
+  const result = await drainQueue(db);
+  await pruneGuardTables(db);
   return Response.json(result);
 }
 
