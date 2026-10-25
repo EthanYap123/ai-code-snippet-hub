@@ -2,7 +2,8 @@
 
 A full-stack knowledge base for code snippets. Paste code in any language. A background worker uses an LLM to write documentation, extract semantic tags and create vector embeddings, so you can find the snippet later by describing what it does ("how to connect to redis in nodejs") rather than remembering what you named it.
 
-**Live demo:** https://ethanyap123.github.io/ai-code-snippet-hub/ (runs entirely in your browser; see [Live demo](#live-demo-github-pages))
+**Live app:** https://ai-code-snippet-hub.vercel.app (the full version on Vercel, Neon Postgres and Gemini)
+**Browser demo:** https://ethanyap123.github.io/ai-code-snippet-hub/ (runs entirely in your browser; see [Live demo](#live-demo-github-pages))
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6) ![Postgres + pgvector](https://img.shields.io/badge/Postgres-pgvector-336791) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8) [![Deploy demo](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/pages.yml/badge.svg)](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/pages.yml)
 
@@ -190,7 +191,7 @@ Useful scripts:
 
 ## Deploying the full version (Vercel + Neon)
 
-The GitHub Pages demo needs no setup. To host the full server version with Gemini and a shared database:
+The full version runs at https://ai-code-snippet-hub.vercel.app, with the database in Neon's Singapore region next to the `sin1` functions. A request after the database has been idle for 7 minutes (long enough for Neon to scale to zero) answered in under a second. The GitHub Pages demo needs no setup. To host your own copy:
 
 1. Import the GitHub repository in Vercel. [`vercel.json`](vercel.json) pins the server build (`npm run build`, never the static demo), the Singapore region (`sin1`) and the daily worker cron.
 2. In the project's **Storage** tab, add a **Neon** Postgres database in the same region. This sets `DATABASE_URL`. Neon ships pgvector, and the app runs `CREATE EXTENSION vector` itself.
