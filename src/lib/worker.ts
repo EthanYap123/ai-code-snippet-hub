@@ -39,7 +39,7 @@ export function embeddingText(engine: Engine, s: { title: string; code: string }
 }
 
 /** Claims the next runnable job atomically (safe with several workers). */
-async function claimJob(db: Db): Promise<JobRow | null> {
+export async function claimJob(db: Db): Promise<JobRow | null> {
   const rows = await db.query<JobRow>(
     `UPDATE jobs
         SET status = 'running', locked_at = now(), attempts = attempts + 1, updated_at = now()

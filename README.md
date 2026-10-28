@@ -6,13 +6,13 @@ A full-stack knowledge base for code snippets. Paste code in any language. A bac
 
 **Browser demo:** https://ethanyap123.github.io/ai-code-snippet-hub/ (runs entirely in your browser; see [Live demo](#live-demo-github-pages))
 
-![Next.js](https://img.shields.io/badge/Next.js-16-black) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6) ![Postgres + pgvector](https://img.shields.io/badge/Postgres-pgvector-336791) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8) [![Deploy demo](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/pages.yml/badge.svg)](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/pages.yml)
+![Next.js](https://img.shields.io/badge/Next.js-16-black) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6) ![Postgres + pgvector](https://img.shields.io/badge/Postgres-pgvector-336791) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8) [![CI](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/ci.yml) [![Deploy demo](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/pages.yml/badge.svg)](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/pages.yml)
 
 ## Features
 
 - **Code editor** — CodeMirror 6 with lazily loaded grammars for 20+ languages, auto language detection, a size limit and Ctrl+Enter to save.
 - **Background enrichment** — every submission becomes a job. A worker generates a structured write-up (summary, explanation, parameters, return value, usage example, complexity, notes), semantic tags and a 768-dimension embedding.
-- **Semantic search** — natural-language queries are embedded and matched through a pgvector HNSW index, then re-ranked with Postgres full-text search. Typical response time is tens of milliseconds.
+- **Semantic search** — natural-language queries are embedded and matched through a pgvector HNSW index, then re-ranked with Postgres full-text search. With the offline engine a search takes tens of milliseconds. On the live site an uncached query first has to be embedded by Gemini, so it takes roughly half a second to a second (668 ms in one measurement); repeated queries hit an in-process cache.
 - **Related snippets** — nearest neighbours in vector space, shown on every snippet page.
 - **Works without an API key** — a built-in offline engine (static analysis plus feature-hashed embeddings with developer synonyms) takes over when no key is set, or when the LLM keeps failing, so the app never ends up broken.
 - **Developer-friendly UI** — dark mode (light / dark / system), Shiki syntax highlighting in both themes, loading skeletons, clear error and empty states, keyboard shortcuts (`/` or Ctrl+K to search) and a responsive layout down to 375 px.
@@ -174,6 +174,7 @@ Useful scripts:
 | `npm run build:demo` | Static in-browser demo build into `out/` |
 | `npm run db:setup -- "your query"` | Apply schema, seed, process every queued job, then run a test search |
 | `npm run typecheck` / `npm run lint` | Type check / lint |
+| `npm test` | Unit and integration tests (see [Testing](#testing)) |
 
 ### Environment variables
 
@@ -189,6 +190,23 @@ Useful scripts:
 | `SEARCH_LIMIT_PER_MINUTE` | `60` | Searches per visitor per minute (`0` disables). The first third may embed the query with Gemini; the rest match on keywords |
 | `GEMINI_DAILY_LIMIT` | `300` | Gemini calls per UTC day across all visitors (`0` disables). After that the offline engine takes over until the next day |
 | `PGLITE_DATA_DIR` | `./.data/pglite` | Where the embedded database lives |
+
+## Testing
+
+```bash
+npm test
+```
+
+The suite uses Node's built-in test runner through `tsx`, so it adds no dependencies. It needs no database server and no API key: each integration test file boots its own in-memory Postgres (PGlite with pgvector) with the real schema, and uses the offline engine.
+
+| File | What it covers |
+| --- | --- |
+| `tests/unit/validation.test.ts` | Request validation: defaults, language auto-detection, size limits, rejected bodies, list-parameter clamping, UUID checks |
+| `tests/unit/languages.test.ts` | Language detection across eight languages |
+| `tests/unit/offline-engine.test.ts` | Tokenising, 768-d hashed embeddings (unit length, deterministic, related text closer than unrelated), offline docs, tag normalisation, pgvector literals |
+| `tests/integration/queue-and-search.test.ts` | Idempotent seeding; the `SKIP LOCKED` queue never double-claims, reclaims stale locks and respects backoff; every snippet ends up documented, tagged and embedded; hybrid search ranks the right snippet first; ownership rules; the daily Gemini budget, cooldown and rate-limit counters |
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs type checking, linting and the tests on every push and pull request.
 
 ## Deploying the full version (Vercel + Neon)
 

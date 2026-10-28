@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
+    "test": "tsx --test \"tests/**/*.test.ts\"",
     "db:setup": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/setup.ts",
     "build:demo": "node scripts/build-demo.mjs"
   },
