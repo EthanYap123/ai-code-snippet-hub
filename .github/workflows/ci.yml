@@ -20,4 +20,16 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test
+      - name: npm test
+        shell: bash
+        run: |
+          set +e
+          npm test > test-output.txt 2>&1
+          status=$?
+          cat test-output.txt
+          if [ $status -ne 0 ]; then
+            # Surface the failure as an annotation, readable without signing in
+            msg=$(grep -v "^#\|^ok \|^    ok\|^  ok" test-output.txt | tail -c 7000 | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=npm test failed::$msg"
+          fi
+          exit $status
