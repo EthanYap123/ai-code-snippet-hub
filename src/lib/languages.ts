@@ -40,7 +40,15 @@ export function isLanguageId(id: string): id is LanguageId {
 
 /** Ordered checks: the first rule with the highest score wins. */
 const RULES: { id: LanguageId; patterns: RegExp[] }[] = [
-  { id: "dockerfile", patterns: [/^\s*FROM\s+[\w./:-]+(\s+AS\s+\w+)?\s*$/im, /^\s*(RUN|COPY|WORKDIR|CMD|ENTRYPOINT|EXPOSE)\s/m] },
+  {
+    id: "dockerfile",
+    patterns: [
+      // FROM must be the first instruction (after comments, blank lines or ARG), so the
+      // FROM line of a SQL query doesn't count.
+      /^(?:[ \t]*(?:#[^\n]*|ARG[^\n]*)?\n)*[ \t]*FROM[ \t]+[\w./:${}-]+(?:[ \t]+AS[ \t]+\w+)?[ \t]*(?:\n|$)/i,
+      /^\s*(RUN|COPY|WORKDIR|CMD|ENTRYPOINT|EXPOSE)\s/m,
+    ],
+  },
   { id: "json", patterns: [/^\s*[{[][\s\S]*[}\]]\s*$/, /^\s*"[\w-]+"\s*:/m] },
   { id: "html", patterns: [/<!doctype html>/i, /<\/?(div|span|html|body|head|section|p|a|ul|li)\b[^>]*>/i] },
   { id: "php", patterns: [/<\?php/, /\$\w+\s*->\w+/, /\bfunction\s+\w+\s*\([^)]*\$\w+/] },
@@ -53,7 +61,7 @@ const RULES: { id: LanguageId; patterns: RegExp[] }[] = [
   { id: "java", patterns: [/\bpublic\s+(static\s+)?(class|void|int|String)\b/, /\bSystem\.out\.println\(/, /\bimport\s+java\./] },
   { id: "kotlin", patterns: [/\bfun\s+\w+\s*\(/, /\bval\s+\w+\s*[:=]/, /\bdata\s+class\b/] },
   { id: "swift", patterns: [/\bfunc\s+\w+\s*\([^)]*\)\s*(->\s*\w+)?\s*{/, /\bguard\s+let\b/, /\bimport\s+(SwiftUI|Foundation|UIKit)\b/] },
-  { id: "csharp", patterns: [/\busing\s+System(\.\w+)*;/, /\bnamespace\s+[\w.]+/, /\bpublic\s+(async\s+)?(Task|string|int|void)\b/, /\bvar\s+\w+\s*=\s*new\b/] },
+  { id: "csharp", patterns: [/\busing\s+System(\.\w+)*;/, /\bnamespace\s+[\w.]+/, /\bpublic\s+(async\s+)?(Task|string|int|void)\b/, /\bvar\s+\w+\s*=\s*new\b/, /\bpublic\s+(static\s+)?(record|struct)\b/, /\b(IEnumerable|IList|IReadOnlyList|Dictionary)<\w+/, /\.(Where|Select|GroupBy|OrderBy|OrderByDescending|ToList|ToDictionary)\(/] },
   { id: "cpp", patterns: [/#include\s*<(iostream|vector|string|map|memory)>/, /\bstd::\w+/, /\btemplate\s*</] },
   { id: "c", patterns: [/#include\s*<(stdio|stdlib|string)\.h>/, /\bprintf\s*\(/, /\bmalloc\s*\(/] },
   { id: "ruby", patterns: [/^\s*def\s+\w+[?!]?(\(.*\))?\s*$/m, /^\s*end\s*$/m, /\bputs\b/, /\.each\s+do\s*\|/] },

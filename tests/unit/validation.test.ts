@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { MAX_CODE_LENGTH, MAX_TITLE_LENGTH } from "../../src/lib/limits";
 import { parseListParams, parseNewSnippet, parseSearchQuery, UUID_RE } from "../../src/lib/validation";
 
-const CODE = "function add(a, b) {\n  return a + b;\n}";
+const CODE = "const add = (a, b) => a + b;\nconsole.log(add(1, 2));";
 
 describe("parseNewSnippet", () => {
   it("accepts a minimal body and fills in defaults", () => {
