@@ -242,6 +242,10 @@ Errors are always JSON (`{ "error": "..." }`) with a meaningful status code: 400
 - **Embeddings from different models don't mix.** Switching models would have silently broken search, because vectors from different models live in different spaces. Now each vector stores its model name.
 - **Semantic search alone isn't enough.** Mixing vector similarity (80%) with Postgres full-text rank (20%) gave better results than either one alone.
 
+## How I used AI to build this
+
+I used Gemini during the ideation process, and Claude Code for help whenever I got stuck.
+
 ## Author
 
 Built by **Ethan Yap**, Year 2 IT student at Singapore Polytechnic. Portfolio: https://ethanyap123.github.io/portfolio/
