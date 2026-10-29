@@ -12,7 +12,7 @@ A full-stack knowledge base for code snippets. Paste code in any language. A bac
 
 - **Code editor** — CodeMirror 6 with lazily loaded grammars for 20+ languages, auto language detection, a size limit and Ctrl+Enter to save.
 - **Background enrichment** — every submission becomes a job. A worker generates a structured write-up (summary, explanation, parameters, return value, usage example, complexity, notes), semantic tags and a 768-dimension embedding.
-- **Semantic search** — natural-language queries are embedded and matched through a pgvector HNSW index, then re-ranked with Postgres full-text search. With the offline engine a search takes tens of milliseconds. On the live site an uncached query first has to be embedded by Gemini, so it takes roughly half a second to a second (668 ms in one measurement); repeated queries hit an in-process cache.
+- **Semantic search** — natural-language queries are embedded and matched through a pgvector HNSW index, then re-ranked with Postgres full-text search. With the offline engine a search takes tens of milliseconds at most (4–18 ms over the seed data, measured locally). On the live site an uncached query first has to be embedded by Gemini, so it takes roughly half a second to a second (measured at 564 ms and 668 ms); a repeated query hits an in-process cache and comes back in about 0.1 s.
 - **Related snippets** — nearest neighbours in vector space, shown on every snippet page.
 - **Works without an API key** — a built-in offline engine (static analysis plus feature-hashed embeddings with developer synonyms) takes over when no key is set, or when the LLM keeps failing, so the app never ends up broken.
 - **Developer-friendly UI** — dark mode (light / dark / system), Shiki syntax highlighting in both themes, loading skeletons, clear error and empty states, keyboard shortcuts (`/` or Ctrl+K to search) and a responsive layout down to 375 px.
@@ -197,12 +197,12 @@ Useful scripts:
 npm test
 ```
 
-The suite uses Node's built-in test runner through `tsx`, so it adds no dependencies. It needs no database server and no API key: each integration test file boots its own in-memory Postgres (PGlite with pgvector) with the real schema, and uses the offline engine.
+73 tests in four files. The suite uses Node's built-in test runner through `tsx`, so it adds no dependencies. It needs no database server and no API key: each integration test file boots its own in-memory Postgres (PGlite with pgvector) with the real schema, and uses the offline engine.
 
 | File | What it covers |
 | --- | --- |
 | `tests/unit/validation.test.ts` | Request validation: defaults, language auto-detection, size limits, rejected bodies, list-parameter clamping, UUID checks |
-| `tests/unit/languages.test.ts` | Language detection across eight languages |
+| `tests/unit/languages.test.ts` | Language detection for 12 languages, including every seed snippet and regressions for SQL queries (once read as Dockerfiles) and C# LINQ (once read as TSX) |
 | `tests/unit/offline-engine.test.ts` | Tokenising, 768-d hashed embeddings (unit length, deterministic, related text closer than unrelated), offline docs, tag normalisation, pgvector literals |
 | `tests/integration/queue-and-search.test.ts` | Idempotent seeding; the `SKIP LOCKED` queue never double-claims, reclaims stale locks and respects backoff; every snippet ends up documented, tagged and embedded; hybrid search ranks the right snippet first; ownership rules; the daily Gemini budget, cooldown and rate-limit counters |
 
