@@ -8,6 +8,8 @@ A full-stack knowledge base for code snippets. Paste code in any language. A bac
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6) ![Postgres + pgvector](https://img.shields.io/badge/Postgres-pgvector-336791) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8) [![CI](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/ci.yml) [![Deploy demo](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/pages.yml/badge.svg)](https://github.com/EthanYap123/ai-code-snippet-hub/actions/workflows/pages.yml)
 
+![Snippet library searched for “how to connect to a database”, with two matching snippets and their match scores](docs/screenshot.jpg)
+
 ## Features
 
 - **Code editor** — CodeMirror 6 with lazily loaded grammars for 20+ languages, auto language detection, a size limit and Ctrl+Enter to save.
@@ -17,34 +19,17 @@ A full-stack knowledge base for code snippets. Paste code in any language. A bac
 - **Works without an API key** — a built-in offline engine (static analysis plus feature-hashed embeddings with developer synonyms) takes over when no key is set, or when the LLM keeps failing, so the app never ends up broken.
 - **Developer-friendly UI** — dark mode (light / dark / system), Shiki syntax highlighting in both themes, loading skeletons, clear error and empty states, keyboard shortcuts (`/` or Ctrl+K to search) and a responsive layout down to 375 px.
 
+## Tech stack
+
+- **Framework:** Next.js 16 (App Router, Cache Components, Turbopack), React 19, TypeScript
+- **Data:** PostgreSQL + pgvector (Neon serverless driver in production, PGlite locally)
+- **AI:** Google Gemini (`gemini-3.5-flash-lite` for docs, `gemini-embedding-001` at 768 dimensions), with an offline fallback engine
+- **UI:** Tailwind CSS 4, CodeMirror 6, Shiki, SWR, lucide icons
+- **Validation:** Zod on every API input and on LLM output
+
 ## Architecture
 
-```mermaid
-flowchart LR
-  subgraph Browser
-    UI["Next.js client components<br/>SWR · CodeMirror"]
-  end
-
-  subgraph "Next.js (App Router, Node runtime)"
-    API["Route handlers<br/>/api/snippets · /api/search · /api/tags · /api/stats"]
-    W["Worker<br/>drainQueue()"]
-    E{"Engine"}
-    G["Gemini<br/>docs + embeddings"]
-    L["Offline engine<br/>heuristics + hashed embeddings"]
-  end
-
-  DB[("Postgres + pgvector<br/>Neon in production<br/>PGlite locally")]
-
-  UI -- "fetch JSON" --> API
-  API -- "insert snippet + job" --> DB
-  API -. "after() response is sent" .-> W
-  W -- "claim job (SKIP LOCKED)" --> DB
-  W --> E
-  E --> G
-  E -- "no key / repeated failure" --> L
-  W -- "docs, tags, vector" --> DB
-  API -- "kNN + full-text re-rank" --> DB
-```
+![Architecture: route handlers save the snippet and a job, a background worker claims it with SKIP LOCKED, calls Gemini or the offline engine and saves docs, tags and embeddings in Postgres with pgvector](docs/architecture.svg)
 
 ### Request flow
 
@@ -112,13 +97,22 @@ GitHub Pages only serves static files, so the demo is a second build of the same
 
 The demo uses the offline engine, because an LLM key can't be shipped in a public page. Snippets visitors add are stored in their own browser only. A GitHub Actions workflow ([`.github/workflows/pages.yml`](.github/workflows/pages.yml)) type-checks, lints, builds and deploys the demo on every push to `main`.
 
-## Tech stack
+## API
 
-- **Framework:** Next.js 16 (App Router, Cache Components, Turbopack), React 19, TypeScript
-- **Data:** PostgreSQL + pgvector (Neon serverless driver in production, PGlite locally)
-- **AI:** Google Gemini (`gemini-3.5-flash-lite` for docs, `gemini-embedding-001` at 768 dimensions), with an offline fallback engine
-- **UI:** Tailwind CSS 4, CodeMirror 6, Shiki, SWR, lucide icons
-- **Validation:** Zod on every API input and on LLM output
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/snippets?tag=&language=&limit=&offset=` | Paginated list (cards) |
+| `POST` | `/api/snippets` | `{ code, title?, language? }` → `201 { id, language }` |
+| `GET` | `/api/snippets/:id` | Snippet with highlighted HTML, docs and related snippets |
+| `DELETE` | `/api/snippets/:id` | Delete your own snippet (`403` for others) |
+| `POST` | `/api/snippets/:id/reprocess` | Re-queue documentation for your own snippet |
+| `GET` | `/api/search?q=` | Hybrid semantic search |
+| `GET` | `/api/tags` | Tags with counts |
+| `GET` | `/api/stats` | Counts, languages, active engine and database |
+| `GET` | `/api/health` | Liveness check (database + engine) |
+| `GET/POST` | `/api/worker` | Drain the job queue (needs `Authorization: Bearer $CRON_SECRET`) |
+
+Errors are always JSON (`{ "error": "..." }`) with a meaningful status code: 400, 403, 404, 422, 429 or 500.
 
 ## Project structure
 
@@ -150,7 +144,7 @@ scripts/setup.ts                Apply schema, seed, drain the queue, optional te
 scripts/build-demo.mjs          Static GitHub Pages build
 ```
 
-## Running locally
+## Getting started
 
 Requirements: Node.js 20 or newer. No database or API key is needed.
 
@@ -208,8 +202,11 @@ npm test
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs type checking, linting and the tests on every push and pull request.
 
-## Deploying the full version (Vercel + Neon)
+## CI and deployment
 
+**CI.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs type checking, ESLint and the tests on every push to `main` and every pull request. [`.github/workflows/pages.yml`](.github/workflows/pages.yml) builds and deploys the [browser demo](#live-demo-github-pages).
+
+**Full version (Vercel + Neon).**
 The full version runs at https://ai-code-snippet-hub.vercel.app, with the database in Neon's Singapore region next to the `sin1` functions. A request after the database has been idle for 7 minutes (long enough for Neon to scale to zero) answered in under a second. The GitHub Pages demo needs no setup. To host your own copy:
 
 1. Import the GitHub repository in Vercel. [`vercel.json`](vercel.json) pins the server build (`npm run build`, never the static demo), the Singapore region (`sin1`) and the daily worker cron.
@@ -217,22 +214,11 @@ The full version runs at https://ai-code-snippet-hub.vercel.app, with the databa
 3. Add `GEMINI_API_KEY` (Production only, so preview deploys don't use the quota) and a random `CRON_SECRET` under **Settings → Environment Variables**.
 4. Deploy. The first request creates the schema and seeds the demo snippets, and the worker documents them in the background within about a minute. To do it up front instead, pull the variables with `vercel env pull .env.local` and run `npm run db:setup`.
 
-## API
+## What I'd improve next
 
-| Method | Path | Description |
-| --- | --- | --- |
-| `GET` | `/api/snippets?tag=&language=&limit=&offset=` | Paginated list (cards) |
-| `POST` | `/api/snippets` | `{ code, title?, language? }` → `201 { id, language }` |
-| `GET` | `/api/snippets/:id` | Snippet with highlighted HTML, docs and related snippets |
-| `DELETE` | `/api/snippets/:id` | Delete your own snippet (`403` for others) |
-| `POST` | `/api/snippets/:id/reprocess` | Re-queue documentation for your own snippet |
-| `GET` | `/api/search?q=` | Hybrid semantic search |
-| `GET` | `/api/tags` | Tags with counts |
-| `GET` | `/api/stats` | Counts, languages, active engine and database |
-| `GET` | `/api/health` | Liveness check (database + engine) |
-| `GET/POST` | `/api/worker` | Drain the job queue (needs `Authorization: Bearer $CRON_SECRET`) |
-
-Errors are always JSON (`{ "error": "..." }`) with a meaningful status code: 400, 403, 404, 422, 429 or 500.
+- Add sign-in so people can keep private collections. Snippets are tied to an anonymous visitor id today.
+- Measure search quality on a fixed set of questions before changing the 80/20 mix of vector and full-text scores, instead of tuning it by eye.
+- Add end-to-end browser tests for the snippet page's live status updates.
 
 ## What I learned
 
